@@ -1,12 +1,13 @@
 from DataLoader_Resnet import CustomImageDataset
 from Resnet_Backbone import Resnet
-from get_image_paths import get_image_paths  # your helper function
 import numpy as np
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
 import pickle
+import os
 import utils
+from BOVW import build_vocabulary, get_bags_of_sifts
 
 
 # =========================================================
@@ -28,7 +29,7 @@ categories = np.array([
 
 #get image paths is given in utils.py
 print('Getting paths and labels for all train and test data\n')
-train_image_paths, test_image_paths, train_labels, test_labels = get_image_paths(data_path, categories)
+train_image_paths, test_image_paths, train_labels, test_labels = utils.get_image_paths(data_path, categories)
 
 #   train_image_paths  1500x1   cell      
 #   test_image_paths   705x1    cell           
@@ -87,15 +88,28 @@ if FEATURE == 'resnet':
 
 elif FEATURE == 'bag of sift':
    
-    if(not exist('vocab.pkl', 'file')):
+    # Parameters for vocabulary building
+    vocab_size = 200  # Options: 100, 200, 500
+    max_features_per_image = 300  # Options: 200, 300, 400
+    
+    save_path = f'vocab_size_{vocab_size}.pkl'
+    
+    if(not os.path.exists(save_path)):
         print('No existing visual word vocabulary found. Computing one from training images\n')
-        vocab_size = 200 #Larger values will work better (to a point) but be slower to compute
-        vocab = build_vocabulary(train_image_paths, vocab_size) #given in BOVW.py
-        save('vocab.mat', 'vocab')
+        print(f'Parameters: vocab_size={vocab_size}, max_features_per_image={max_features_per_image}')
+        vocab = build_vocabulary(train_image_paths, vocab_size, 
+                                max_features_per_image=max_features_per_image,
+                                save_path=save_path) #given in BOVW.py
+    else:
+        print(f'Loading existing vocabulary from {save_path}')
+        with open(save_path, 'rb') as f:
+            vocab = pickle.load(f)
      
     # Code get_bags_of_sifts function
-    train_image_feats = get_bags_of_sifts(train_image_paths) #given in BOVW.py
-    test_image_feats  = get_bags_of_sifts(test_image_paths)
+    print('Getting bag of sift features for training images...')
+    train_image_feats = get_bags_of_sifts(train_image_paths, vocab_size=vocab_size) #given in BOVW.py
+    print('Getting bag of sift features for test images...')
+    test_image_feats  = get_bags_of_sifts(test_image_paths, vocab_size=vocab_size)
    
 
 elif FEATURE == 'placeholder':
@@ -150,4 +164,4 @@ else:
 # for this assignment.
 
 # This function will plot confusion matrix and accuracy of your model
-display_results(test_labels, categories, predicted_categories) #given in utils.py
+utils.display_results(test_labels, categories, predicted_categories) #given in utils.py

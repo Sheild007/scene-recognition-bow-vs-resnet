@@ -1,10 +1,58 @@
+import cv2
+import numpy as np
+from sklearn.cluster import KMeans
+import pickle
 
 #This function will sample SIFT descriptors from the training images,
 #cluster them with kmeans, and then return the cluster centers.
 
-def build_vocabulary(image_paths, vocab_size):
+def build_vocabulary(image_paths, vocab_size, max_features_per_image=None, save_path=None):
+  
+    sift = cv2.SIFT_create()
+    all_descriptors = []
+    
+    print(f"Extracting SIFT features from {len(image_paths)} images...")
+   
+    for idx, img_path in enumerate(image_paths):
+       
+        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+        
+       if img is not None:
+    
+            keypoints, descriptors = sift.detectAndCompute(img, None)
+            
+            if descriptors is not None:
+                
+                if max_features_per_image and len(descriptors) > max_features_per_image:
+                    indices = np.random.choice(len(descriptors), max_features_per_image, replace=False)
+                    descriptors = descriptors[indices]
+                
+                all_descriptors.append(descriptors)
+            
+           
+            if (idx + 1) % 100 == 0:
+                print(f"Processed {idx + 1}/{len(image_paths)} images")
+        
+
+        all_descriptors = np.vstack(all_descriptors)
+        print(f"Total descriptors collected: {len(all_descriptors)}")
+        
+        # Cluster with k-means
+        print(f"Clustering {len(all_descriptors)} descriptors into {vocab_size} visual words...")
+        kmeans = KMeans(n_clusters=vocab_size, random_state=42, n_init=15)
+        kmeans.fit(all_descriptors)
+        
+        vocab = kmeans.cluster_centers_
+        print(f"Vocabulary shape: {vocab.shape}")
+    
+ 
+    if save_path:
+        with open(save_path, 'wb') as f:
+            pickle.dump(vocab, f)
+        print(f"Vocabulary saved to {save_path}")
     
     return vocab
+
 # The inputs are 'image_paths', a N x 1 cell array of image paths, and
 # 'vocab_size' the size of the vocabulary.
 
@@ -28,8 +76,53 @@ def build_vocabulary(image_paths, vocab_size):
 
 
 
-def get_bags_of_sifts(image_paths):
+def get_bags_of_sifts(image_paths, vocab_size=None):
     
+    if vocab_size:
+        vocab_file = f'vocab_size_{vocab_size}.pkl'
+    else:
+        vocab_file = 'vocab.pkl'
+    
+    if not os.path.exists(vocab_file):
+        print(f"Error: Vocabulary file not found at {vocab_file}")
+        return None
+
+    with open(vocab_file, 'rb') as f:
+        vocab = pickle.load(f)
+    
+    actual_vocab_size = vocab.shape[0]
+    print(f"Loaded vocabulary with {actual_vocab_size} visual words from {vocab_file}")
+
+    sift = cv2.SIFT_create()
+    
+    image_feats = []
+    
+    for img_path in image_paths:
+        img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+
+    
+        if img is None:
+            image_feats.append(np.zeros(actual_vocab_size))
+        else:
+            keypoints, descriptors = sift.detectAndCompute(img, None)
+
+            if descriptors is None or len(descriptors) == 0:
+                image_feats.append(np.zeros(actual_vocab_size))
+            else:
+            
+                distances = np.linalg.norm(descriptors[:, np.newaxis, :] - vocab[np.newaxis, :, :], axis=2)
+                nearest_clusters = np.argmin(distances, axis=1)
+                histogram = np.bincount(nearest_clusters, minlength=actual_vocab_size)
+
+                if histogram.sum() > 0:
+                    histogram = histogram / histogram.sum()
+
+                image_feats.append(histogram)11  
+
+    image_feats = np.array(image_feats)
+    print(f"Created features with shape: {image_feats.shape}")
+    
+    return image_feats
 # Use SIFT from Open-CV library refer to the code below for help and update perameters
 # to install open-cv use following commands
 # pip install opencv-python
@@ -49,7 +142,7 @@ def get_bags_of_sifts(image_paths):
     
     
     
-    return image_feats
+   
 
 # image_paths is an N x 1 cell array of strings where each string is an
 # image path on the file system.
@@ -74,6 +167,7 @@ def get_bags_of_sifts(image_paths):
 
 #  SIFT_features is a 128 x N matrix of SIFT features
 #   note: there are smoothing parameters you can manipulate for sift function
+
 
 
 
