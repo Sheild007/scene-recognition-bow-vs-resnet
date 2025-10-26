@@ -17,10 +17,11 @@ def get_image_paths(data_path, categories):
         train_labels = train_labels + [cat]*len(imgs)
 
     test_image_paths, test_labels = [], []
-    for cat in os.listdir(data_path+'test/'):
+    for cat in categories:
         imgs = glob.glob(data_path+'test/'+cat+'/*.*')
-        test_image_paths = test_image_paths + imgs
-        test_labels = test_labels + [cat]*len(imgs)
+        if len(imgs) > 0:  
+            test_image_paths = test_image_paths + imgs
+            test_labels = test_labels + [cat]*len(imgs)
 
     return np.array(train_image_paths), np.array(test_image_paths), np.array(train_labels), np.array(test_labels)  
 
