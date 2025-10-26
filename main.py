@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import pickle
 import os
 import utils
-from BOVW import build_vocabulary, get_bags_of_sifts
+from BOVW import build_vocabulary, get_bags_of_sifts, save_features_to_pickle
 
 
 # =========================================================
@@ -19,7 +19,7 @@ from BOVW import build_vocabulary, get_bags_of_sifts
 FEATURE = 'bag of sift'
 CLASSIFIER = 'placeholder'  # options: 'nearest neighbor', 'support vector machine'
 
-data_path = '../../data/'
+data_path = './data/'
 
 categories = np.array([
     'Kitchen', 'Store', 'Bedroom', 'LivingRoom', 'Office',
@@ -110,6 +110,15 @@ elif FEATURE == 'bag of sift':
     train_image_feats = get_bags_of_sifts(train_image_paths, vocab_size=vocab_size) #given in BOVW.py
     print('Getting bag of sift features for test images...')
     test_image_feats  = get_bags_of_sifts(test_image_paths, vocab_size=vocab_size)
+    
+    # Save features to pickle file
+    feat_save_path = f'bow_features_vocab_{vocab_size}.pkl'
+    save_features_to_pickle({
+        'train_features': train_image_feats,
+        'test_features': test_image_feats,
+        'train_labels': train_labels,
+        'test_labels': test_labels
+    }, feat_save_path)
    
 
 elif FEATURE == 'placeholder':
