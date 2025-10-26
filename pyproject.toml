@@ -1,0 +1,36 @@
+[project]
+name = "scene-recognition"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "glob2>=0.7",
+    "matplotlib>=3.10.7",
+    "numpy>=2.3.4",
+    "opencv-python>=4.11.0.86",
+    "pandas>=2.3.3",
+    "pillow>=12.0.0",
+    "pypickle>=2.0.1",
+    "scikit-learn>=1.7.2",
+    "torch>=2.7.0",
+    "torchvision>=0.22.0",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu" },
+]
+torchvision = [
+  { index = "pytorch-cpu" },
+]
+
+[tool.uv]
+required-environments = [
+    'sys_platform == "linux" and platform_machine == "x86_64"',
+]
