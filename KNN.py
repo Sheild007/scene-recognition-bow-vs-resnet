@@ -7,33 +7,19 @@ import numpy as np
 from collections import Counter
 
 def nearest_neighbor_classify(train_image_feats, train_labels, test_image_feats, k=3):
-    """
-    Classify test images using k-nearest neighbors.
-    
-    Args:
-        train_image_feats: N x d matrix of training features
-        train_labels: N x 1 array of training labels
-        test_image_feats: M x d matrix of test features
-        k: Number of nearest neighbors to consider
-    
-    Returns:
-        predicted_categories: M x 1 array of predicted labels
-    """
+
     predicted_categories = []
-    
+
     print(f"Using k={k} nearest neighbors")
     
     for idx, test_feat in enumerate(test_image_feats):
-        # Compute L2 distances to all training features
+        
         distances = np.linalg.norm(train_image_feats - test_feat, axis=1)
         
-        # Get indices of k nearest neighbors
         k_nearest_indices = np.argsort(distances)[:k]
         
-        # Get labels of k nearest neighbors
         k_nearest_labels = train_labels[k_nearest_indices]
         
-        # Majority voting - find the most common label
         label_counter = Counter(k_nearest_labels)
         predicted_label = label_counter.most_common(1)[0][0]
         
