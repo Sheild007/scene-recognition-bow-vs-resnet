@@ -326,3 +326,211 @@ utils.display_results(test_labels, categories, predicted_categories,
                       vocab_size=vocab_size_param)
 
 
+# =========================================================
+# Step 8: Testing Functions
+# =========================================================
+
+def extract_bovw_features_single(image_path, vocab_path):
+    """Extract BoVW features from a single image."""
+    with open(vocab_path, 'rb') as f:
+        vocab = pickle.load(f)
+    
+    vocab_size = vocab.shape[0]
+    features = get_bags_of_sifts([image_path], vocab_size=None)
+    return features[0]
+
+
+def extract_resnet_features_single(image_path, model, device='cpu'):
+    """Extract ResNet features from a single image - helper for testing functions."""
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    
+    img = Image.open(image_path).convert('RGB')
+    img_tensor = transform(img).unsqueeze(0).to(device)
+    
+    model.eval()
+    with torch.no_grad():
+        features = model(img_tensor)
+    
+    return features.cpu().numpy().flatten()
+
+
+def testing_onOneImage(image_path, classifier_type, model_path=None, bow_vocab_path='vocab_size_200.pkl'):
+    """Test a single image with either KNN or SVM classifier."""
+    print("\n" + "="*70)
+    print(f"TESTING SINGLE IMAGE")
+    print("="*70)
+    print(f"Image path: {image_path}")
+    print(f"Classifier: {classifier_type}")
+    print(f"{'='*70}\n")
+    
+    # Load BoVW features
+    try:
+        features_file = f'bow_features_vocab_200.pkl'
+        with open(features_file, 'rb') as f:
+            train_data = pickle.load(f)
+            train_image_feats_bovw = train_data['train_features']
+            train_labels_data = train_data['train_labels']
+    except FileNotFoundError:
+        print("Error: BoVW features not found. Please run main.py first.")
+        return None
+    
+    print("Extracting features from image...")
+    image_feats_bovw = extract_bovw_features_single(image_path, bow_vocab_path)
+    
+    print(f"\nClassifying with {classifier_type}...")
+    
+    if classifier_type == 'KNN':
+        k = 3
+        predicted_label_bovw = nearest_neighbor_classify(
+            train_image_feats_bovw.reshape(len(train_image_feats_bovw), -1),
+            train_labels_data,
+            image_feats_bovw.reshape(1, -1),
+            k=k
+        )
+        print(f"\nPredicted label (BoVW+KNN): {predicted_label_bovw[0]}")
+        return predicted_label_bovw[0]
+        
+    elif classifier_type == 'SVM':
+        if model_path and os.path.exists(model_path):
+            with open(model_path, 'rb') as f:
+                model_data = pickle.load(f)
+                svm_model = model_data['model']
+            
+            predicted_label_bovw = svm_model.predict(image_feats_bovw.reshape(1, -1))
+            print(f"\nPredicted label (BoVW+SVM): {predicted_label_bovw[0]}")
+            return predicted_label_bovw[0]
+        else:
+            print(f"Error: Model file not found at {model_path}")
+            return None
+    else:
+        print("Error: classifier_type must be 'KNN' or 'SVM'")
+        return None
+
+
+def testing_AllImages(image_folder_path, classifier_type, model_path=None, bow_vocab_path='vocab_size_200.pkl'):
+    """Test all images in a folder and compute overall accuracy and confusion matrix."""
+    print("\n" + "="*70)
+    print(f"TESTING ALL IMAGES IN FOLDER")
+    print("="*70)
+    print(f"Image folder: {image_folder_path}")
+    print(f"Classifier: {classifier_type}")
+    print(f"{'='*70}\n")
+    
+    # Get all image paths
+    image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']
+    image_paths = []
+    for ext in image_extensions:
+        image_paths.extend(glob.glob(os.path.join(image_folder_path, ext)))
+        image_paths.extend(glob.glob(os.path.join(image_folder_path, '**', ext), recursive=True))
+    
+    if len(image_paths) == 0:
+        print(f"Error: No images found in {image_folder_path}")
+        return None, None
+    
+    print(f"Found {len(image_paths)} images to test\n")
+    
+    # Load BoVW features
+    try:
+        features_file = f'bow_features_vocab_200.pkl'
+        with open(features_file, 'rb') as f:
+            train_data = pickle.load(f)
+            train_image_feats_bovw = train_data['train_features']
+            train_labels_data = train_data['train_labels']
+    except FileNotFoundError:
+        print("Error: BoVW features not found. Please run main.py first.")
+        return None, None
+    
+    # Extract features for all test images
+    print("Extracting features from all images...")
+    test_features_bovw = []
+    true_labels = []
+    
+    for idx, img_path in enumerate(image_paths):
+        if (idx + 1) % 10 == 0:
+            print(f"Processing image {idx + 1}/{len(image_paths)}")
+        
+        # Extract BoVW features
+        feat = extract_bovw_features_single(img_path, bow_vocab_path)
+        test_features_bovw.append(feat)
+        
+        # Get ground truth label from folder name
+        folder_name = os.path.basename(os.path.dirname(img_path))
+        true_labels.append(folder_name)
+    
+    test_features_bovw = np.array(test_features_bovw)
+    
+    # Classify all images
+    print(f"\nClassifying all images with {classifier_type}...")
+    predicted_labels = []
+    
+    if classifier_type == 'KNN':
+        k = 3
+        for feat in test_features_bovw:
+            pred = nearest_neighbor_classify(
+                train_image_feats_bovw.reshape(len(train_image_feats_bovw), -1),
+                train_labels_data,
+                feat.reshape(1, -1),
+                k=k
+            )
+            predicted_labels.append(pred[0])
+    
+    elif classifier_type == 'SVM':
+        if model_path and os.path.exists(model_path):
+            with open(model_path, 'rb') as f:
+                model_data = pickle.load(f)
+                svm_model = model_data['model']
+            
+            predicted_labels = svm_model.predict(test_features_bovw)
+        else:
+            print(f"Error: Model file not found at {model_path}")
+            return None, None
+    
+    # Calculate accuracy
+    true_labels = np.array(true_labels)
+    predicted_labels = np.array(predicted_labels)
+    
+    accuracy = accuracy_score(true_labels, predicted_labels)
+    print(f"\nOverall Accuracy: {accuracy:.4f}")
+    print(f"  Correct: {np.sum(true_labels == predicted_labels)}/{len(true_labels)}")
+    
+    # Create and save confusion matrix
+    unique_labels_list = sorted(np.unique(np.hstack([true_labels, predicted_labels])))
+    cm = confusion_matrix(true_labels, predicted_labels, labels=unique_labels_list)
+    
+    plt.figure(figsize=(12, 10))
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title(f'Confusion Matrix - {classifier_type}', fontsize=14, fontweight='bold')
+    plt.colorbar()
+    tick_marks = np.arange(len(unique_labels_list))
+    plt.xticks(tick_marks, unique_labels_list, rotation=45, ha='right')
+    plt.yticks(tick_marks, unique_labels_list)
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    
+    # Add text annotations
+    thresh = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            plt.text(j, i, format(cm[i, j], 'd'),
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > thresh else "black")
+    
+    plt.tight_layout()
+    
+    save_path = f'results/confusion_matrix_{classifier_type}.png'
+    os.makedirs('results', exist_ok=True)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"Confusion matrix saved to {save_path}")
+    plt.close()
+    
+    print("\n" + "="*70)
+    print("Classification Report:")
+    print("="*70)
+    print(classification_report(true_labels, predicted_labels, labels=unique_labels_list))
+    print("="*70 + "\n")
+    
+    return accuracy, cm
