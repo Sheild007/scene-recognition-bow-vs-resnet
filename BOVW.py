@@ -37,16 +37,12 @@ def build_vocabulary(image_paths, vocab_size, max_features_per_image=None, save_
     all_descriptors = np.vstack(all_descriptors)
     print(f"Total descriptors collected: {len(all_descriptors)}")
     
-   
-  
     print(f"Clustering {len(all_descriptors)} descriptors into {vocab_size} visual words...")
-    kmeans = KMeans(n_clusters=vocab_size, random_state=42, n_init=10) # n_init=10 is default and often fine
+    kmeans = KMeans(n_clusters=vocab_size, random_state=42, n_init=10) 
     kmeans.fit(all_descriptors)
     
     vocab = kmeans.cluster_centers_
     print(f"Vocabulary shape: {vocab.shape}")
-
-
     if save_path:
         
         dir_name = os.path.dirname(save_path)
@@ -122,9 +118,7 @@ def get_bags_of_sifts(image_paths, vocab_size=None):
     return image_feats
 
 def plot_histogram(histogram, vocab_size, save_path=None, title=None):
-    """
-    Plots a single Bag of Visual Words histogram.
-    """
+
     plt.figure(figsize=(12, 6))
     plt.bar(range(vocab_size), histogram)
     plt.xlabel('Visual Word Index')
@@ -145,9 +139,7 @@ def plot_histogram(histogram, vocab_size, save_path=None, title=None):
     plt.close()
 
 def visualize_sift_keypoints(image_path, save_path=None, max_keypoints=500):
-    """
-    Detects and draws SIFT keypoints on an image.
-    """
+
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     
     if img is None:
@@ -162,14 +154,12 @@ def visualize_sift_keypoints(image_path, save_path=None, max_keypoints=500):
   
     keypoints, descriptors = sift.detectAndCompute(img, None)
     
-    
     img_with_keypoints = cv2.drawKeypoints(
         img_color, 
         keypoints, 
         None, 
         flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
     )
-    
 
     plt.figure(figsize=(12, 8))
     plt.imshow(cv2.cvtColor(img_with_keypoints, cv2.COLOR_BGR2RGB))
@@ -186,10 +176,7 @@ def visualize_sift_keypoints(image_path, save_path=None, max_keypoints=500):
     plt.close()
 
 def save_features_to_pickle(features, file_path):
-    """
-    Saves a variable (e.g., features) to a pickle file.
-    """
-    # Only create directory if save_path contains a directory
+  
     dir_name = os.path.dirname(file_path)
     if dir_name:
         os.makedirs(dir_name, exist_ok=True)
@@ -198,9 +185,7 @@ def save_features_to_pickle(features, file_path):
     print(f"Features saved to {file_path}")
 
 def load_features_from_pickle(file_path):
-    """
-    Loads features from a pickle file.
-    """
+
     if not os.path.exists(file_path):
         print(f"Error: File not found at {file_path}")
         return None
