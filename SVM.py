@@ -12,36 +12,22 @@ import os
 #B are the learned hyperplane parameters.
 
 def svm_classify(train_image_feats, train_labels, test_image_feats, save_model=True, model_path='svm_model.pkl'):
-    """
-    Classify test images using linear SVM.
     
-    Args:
-        train_image_feats: N x d matrix of training features
-        train_labels: N x 1 array of training labels
-        test_image_feats: M x d matrix of test features
-        save_model: Whether to save the trained model
-        model_path: Path to save the model
-    
-    Returns:
-        predicted_categories: M x 1 array of predicted labels
-    """
-    categories = list(set(train_labels))
+    # IMPORTANT: Sort categories to ensure consistent ordering
+    categories = sorted(list(set(train_labels)))
     num_categories = len(categories)
     print(f"Training SVM with {num_categories} categories")
     
-    # Make an SVM classifier with one-vs-rest strategy
+  
     clf = svm.LinearSVC(dual=False, random_state=42)
     
-    # Fit on the training data
     print("Training SVM classifier...")
     clf.fit(train_image_feats, train_labels)
     print("Training completed!")
     
-    # Predict labels for test features
     print("Predicting test image labels...")
     predicted_categories = clf.predict(test_image_feats)
     
-    # Save the model if requested
     if save_model:
         model_data = {
             'model': clf,
