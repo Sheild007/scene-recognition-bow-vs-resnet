@@ -8,6 +8,8 @@ import pickle
 import os
 import utils
 from BOVW import build_vocabulary, get_bags_of_sifts, save_features_to_pickle
+from SVM import svm_classify
+from KNN import nearest_neighbor_classify
 
 
 # =========================================================
@@ -17,7 +19,7 @@ from BOVW import build_vocabulary, get_bags_of_sifts, save_features_to_pickle
 
 # 'resnet18'
 FEATURE = 'bag of sift'
-CLASSIFIER = 'placeholder'  # options: 'nearest neighbor', 'support vector machine'
+CLASSIFIER = 'support vector machine'  # options: 'nearest neighbor', 'support vector machine'
 
 data_path = './data/'
 
@@ -72,18 +74,40 @@ if FEATURE == 'resnet':
     print("Train size:", len(train_dataset))
     print("Test size:", len(test_dataset))
 
-    print('getting feature maps from resnet')
+    print('Getting feature maps from resnet')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     resnet_model = Resnet('resnet18').to(device)
+    resnet_model.eval()
     
+    # Extract features from training images
+    train_image_feats = []
+    print('Extracting features from training images...')
     with torch.no_grad():
         for images, labels in train_loader:
             images = images.to(device)
             feats = resnet_model(images)  # [batch, 512]
-            # store these feature maps and corresponding labels to an array as they will be the input to your classifer
-            # these array will also be needed for tsne plot  
+            train_image_feats.append(feats.cpu().numpy())
     
-    #  tsne plot function is given in Resnet_Backbone.py as display_features
+    train_image_feats = np.vstack(train_image_feats)
+    print(f'Train features shape: {train_image_feats.shape}')
+    
+    # Extract features from test images
+    test_image_feats = []
+    print('Extracting features from test images...')
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images = images.to(device)
+            feats = resnet_model(images)  # [batch, 512]
+            test_image_feats.append(feats.cpu().numpy())
+    
+    test_image_feats = np.vstack(test_image_feats)
+    print(f'Test features shape: {test_image_feats.shape}')
+    
+    # Optional: t-SNE visualization
+    # Uncomment the following lines to generate t-SNE visualization
+    # resnet_model.display_features(train_image_feats, train_labels, 
+    #                               title="t-SNE visualization of ResNet features (Training)",
+    #                               save_path='results_mine/tsne_resnet.png')
 
 
 elif FEATURE == 'bag of sift':
@@ -147,10 +171,28 @@ else:
 print('Using', CLASSIFIER, 'classifier to predict test set categories\n')
 
 if CLASSIFIER == 'nearest neighbor':
-    predicted_categories = nearest_neighbor_classify(train_image_feats, train_labels, test_image_feats)
+    # Test with different k values
+    k_values = [1, 3, 5, 7, 9, 11, 15]
+    all_results = {}
+    
+    for k in k_values:
+        print(f"\n{'='*60}")
+        print(f"Testing with k={k}")
+        print(f"{'='*60}\n")
+        predicted_categories = nearest_neighbor_classify(train_image_feats, train_labels, test_image_feats, k=k)
+        
+        # Calculate accuracy
+        accuracy = np.sum(predicted_categories == test_labels) / len(test_labels)
+        all_results[k] = {'predictions': predicted_categories, 'accuracy': accuracy}
+        print(f"\nAccuracy for k={k}: {accuracy:.4f}")
+        print(f"{'='*60}\n")
+    
+    # Use k=3 as default
+    predicted_categories = all_results[3]['predictions']
 
 elif CLASSIFIER == 'support vector machine':
-    predicted_categories = svm_classify(train_image_feats, train_labels, test_image_feats)
+    predicted_categories = svm_classify(train_image_feats, train_labels, test_image_feats, 
+                                        save_model=True, model_path='svm_model.pkl')
 
 elif CLASSIFIER == 'placeholder':
     # Random guessing for debugging
