@@ -31,26 +31,48 @@ class Resnet(nn.Module):
         x = torch.flatten(x, 1)  # flatten to (batch_size, 512)
         return x
     
-    def display_features(self,features_list,labels_list):
+    def display_features(self, features, labels, title="t-SNE visualization", save_path=None):
+        """
+        Display features using t-SNE visualization.
         
-        self.eval() #setting model to eval mode
-
-        features_list = []
-        labels_list = []
-
-        # Stack all batches
-        features = np.vstack(features_list)
-        labels = np.hstack(labels_list)
+        Args:
+            features: numpy array of features (N x d)
+            labels: numpy array of labels (N,)
+            title: Title for the plot
+            save_path: Optional path to save the plot
+        """
+        self.eval() # setting model to eval mode
 
         print("Feature shape before t-SNE:", features.shape)
+        print(f"Number of samples: {len(features)}")
 
-        # Apply t-SNE (reduce 512-dim → 2D for plotting)
-        tsne = TSNE(n_components=2, random_state=42, perplexity=30)
+        # Apply t-SNE (reduce to 2D for plotting)
+        tsne = TSNE(n_components=2, random_state=42, perplexity=30, max_iter=1000)
         features_2d = tsne.fit_transform(features)
 
+        # Convert labels to numeric if they are strings
+        unique_labels = np.unique(labels)
+        label_to_idx = {label: idx for idx, label in enumerate(unique_labels)}
+        numeric_labels = np.array([label_to_idx[label] for label in labels])
+
         # Plot
-        plt.figure(figsize=(10,8))
-        scatter = plt.scatter(features_2d[:,0], features_2d[:,1], c=labels, cmap='tab10', s=15, alpha=0.7)
-        plt.legend(*scatter.legend_elements(), title="Classes")
-        plt.title("t-SNE visualization of ResNet features")
-        plt.show()
+        plt.figure(figsize=(12, 8))
+        scatter = plt.scatter(features_2d[:,0], features_2d[:,1], c=numeric_labels, 
+                             cmap='tab20', s=15, alpha=0.6, edgecolors='black', linewidths=0.1)
+        
+        # Add colorbar
+        cbar = plt.colorbar(scatter, ticks=range(len(unique_labels)))
+        cbar.set_ticklabels(unique_labels)
+        
+        plt.xlabel("t-SNE dimension 1")
+        plt.ylabel("t-SNE dimension 2")
+        plt.title(title)
+        plt.grid(True, alpha=0.3)
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"t-SNE plot saved to {save_path}")
+        else:
+            plt.show()
+        
+        plt.close()
