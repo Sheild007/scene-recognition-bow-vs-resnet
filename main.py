@@ -6,6 +6,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 import pickle
 import os
+import argparse
 import utils
 from BOVW import build_vocabulary, get_bags_of_sifts, save_features_to_pickle
 from SVM import svm_classify
@@ -16,12 +17,29 @@ from KNN import nearest_neighbor_classify
 # Step 0: Setup parameters, paths, and category info
 # =========================================================
 
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description='Scene Recognition using BoW or ResNet features with KNN or SVM classifier')
+parser.add_argument('--input', type=str, default='./data/', help='Input folder containing train and test data')
+parser.add_argument('--output', type=str, default='./results_mine/', help='Output folder for results')
+parser.add_argument('--feature', type=str, choices=['bow', 'resnet'], default='bow', 
+                    help='Feature type: bag of words (bow) or resnet')
+parser.add_argument('--model', type=str, choices=['knn', 'svm'], default='svm', 
+                    help='Classification model: knn or svm')
+parser.add_argument('--vocab_size', type=int, default=200, 
+                    help='Vocabulary size for bag of words (default: 200, options: 100, 200, 500)')
 
-# 'resnet18'
-FEATURE = 'bag of sift'
-CLASSIFIER = 'support vector machine'  # options: 'nearest neighbor', 'support vector machine'
+args = parser.parse_args()
 
-data_path = './data/'
+# Map arguments to internal variables
+FEATURE = 'bag of sift' if args.feature == 'bow' else 'resnet'
+CLASSIFIER = 'nearest neighbor' if args.model == 'knn' else 'support vector machine'
+
+data_path = args.input
+output_path = args.output
+vocab_size = args.vocab_size
+
+# Ensure output directory exists
+os.makedirs(output_path, exist_ok=True)
 
 categories = np.array([
     'Kitchen', 'Store', 'Bedroom', 'LivingRoom', 'Office',
@@ -113,7 +131,6 @@ if FEATURE == 'resnet':
 elif FEATURE == 'bag of sift':
    
     # Parameters for vocabulary building
-    vocab_size = 200  # Options: 100, 200, 500
     max_features_per_image = 300  # Options: 200, 300, 400
     
     save_path = f'vocab_size_{vocab_size}.pkl'
@@ -191,8 +208,14 @@ if CLASSIFIER == 'nearest neighbor':
     predicted_categories = all_results[3]['predictions']
 
 elif CLASSIFIER == 'support vector machine':
+    # Determine model save path based on feature type
+    if FEATURE == 'bag of sift':
+        model_path = os.path.join(output_path, f'svm_model_bovw_vocab_{vocab_size}.pkl')
+    else:
+        model_path = os.path.join(output_path, 'svm_model_resnet.pkl')
+    
     predicted_categories = svm_classify(train_image_feats, train_labels, test_image_feats, 
-                                        save_model=True, model_path='svm_model.pkl')
+                                        save_model=True, model_path=model_path)
 
 elif CLASSIFIER == 'placeholder':
     # Random guessing for debugging
@@ -215,4 +238,12 @@ else:
 # for this assignment.
 
 # This function will plot confusion matrix and accuracy of your model
-utils.display_results(test_labels, categories, predicted_categories) #given in utils.py
+feature_str = 'bovw' if FEATURE == 'bag of sift' else 'resnet'
+model_str = 'knn' if CLASSIFIER == 'nearest neighbor' else 'svm'
+vocab_size_param = vocab_size if FEATURE == 'bag of sift' else None
+
+utils.display_results(test_labels, categories, predicted_categories, 
+                      save_path=output_path, 
+                      feature_type=feature_str, 
+                      model_type=model_str,
+                      vocab_size=vocab_size_param)
