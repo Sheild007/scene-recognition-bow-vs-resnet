@@ -90,7 +90,7 @@ def perf_measure(y_actual, y_hat):
 
     return [TP, FP, TN, FN]
 
-def display_results(test_labels, categories, predicted_categories):
+def display_results(test_labels, categories, predicted_categories, save_path=None, feature_type='', model_type='', vocab_size=None):
 
     df = pd.DataFrame(columns= ['Category']+list(categories))
 
@@ -100,7 +100,7 @@ def display_results(test_labels, categories, predicted_categories):
         temp_y_test = (test_labels == el).astype(int)
         temp_preds = (predicted_categories == el).astype(int)
         row = [el]+ perf_measure(temp_y_test, temp_preds)
-        df = df.append(pd.Series(row, index=cols), ignore_index=True)
+        df = pd.concat([df, pd.DataFrame([row], columns=cols)], ignore_index=True)
     print(df, '\n\n')
 
     for i in range(len(categories)):
@@ -111,7 +111,24 @@ def display_results(test_labels, categories, predicted_categories):
     class_names=np.array(categories)
     plot_confusion_matrix(test_labels, predicted_categories, classes=class_names)
     fig = plt.gcf()
-    fig.show()
+    
+    # Save confusion matrix if save_path is provided
+    if save_path:
+        # Create subdirectory for confusion matrices
+        cm_dir = os.path.join(save_path, 'confusion_matrices')
+        os.makedirs(cm_dir, exist_ok=True)
+        
+        # Create filename based on feature and model type
+        if vocab_size:
+            filename = f'cm_{feature_type}_{model_type}_vocab_{vocab_size}.png'
+        else:
+            filename = f'cm_{feature_type}_{model_type}.png'
+        
+        filepath = os.path.join(cm_dir, filename)
+        fig.savefig(filepath, dpi=300, bbox_inches='tight')
+        print(f'Confusion matrix saved to {filepath}')
+    else:
+        fig.show()
     
     f1 = f1_score(y_pred=predicted_categories, y_true=test_labels,average='macro') #you need to put your own array names here
     print('f1 score: ', f1)
