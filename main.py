@@ -1,23 +1,39 @@
-from DataLoader_Resnet import CustomImageDataset
-from Resnet_Backbone import Resnet
+# Roll Number: BSCS22008
+# Name: Muhammad Usman Muneer
+# Assignment Number: 3
+
+
+import os
+import argparse
+import pickle
+import glob
+import cv2
+import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from PIL import Image
+
 import numpy as np
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
-import pickle
-import os
-import argparse
+
+
 import utils
-from BOVW import build_vocabulary, get_bags_of_sifts, save_features_to_pickle
+from DataLoader_Resnet import CustomImageDataset
+from Resnet_Backbone import Resnet
+from BOVW import (
+    build_vocabulary, 
+    get_bags_of_sifts, 
+    save_features_to_pickle,
+    plot_histogram, 
+    visualize_sift_keypoints
+)
 from SVM import svm_classify
 from KNN import nearest_neighbor_classify
 
 
-# =========================================================
-# Step 0: Setup parameters, paths, and category info
-# =========================================================
 
-# Parse command-line arguments
+
 parser = argparse.ArgumentParser(description='Scene Recognition using BoW or ResNet features with KNN or SVM classifier')
 parser.add_argument('--input', type=str, default='./data/', help='Input folder containing train and test data')
 parser.add_argument('--output', type=str, default='./results_mine/', help='Output folder for results')
@@ -30,7 +46,7 @@ parser.add_argument('--vocab_size', type=int, default=200,
 
 args = parser.parse_args()
 
-# Map arguments to internal variables
+
 FEATURE = 'bag of sift' if args.feature == 'bow' else 'resnet'
 CLASSIFIER = 'nearest neighbor' if args.model == 'knn' else 'support vector machine'
 
@@ -38,7 +54,7 @@ data_path = args.input
 output_path = args.output
 vocab_size = args.vocab_size
 
-# Ensure output directory exists
+
 os.makedirs(output_path, exist_ok=True)
 
 categories = np.array([
@@ -121,11 +137,12 @@ if FEATURE == 'resnet':
     test_image_feats = np.vstack(test_image_feats)
     print(f'Test features shape: {test_image_feats.shape}')
     
-    # Optional: t-SNE visualization
-    # Uncomment the following lines to generate t-SNE visualization
-    # resnet_model.display_features(train_image_feats, train_labels, 
-    #                               title="t-SNE visualization of ResNet features (Training)",
-    #                               save_path='results_mine/tsne_resnet.png')
+    # Generate t-SNE visualization for ResNet features
+    print('\nGenerating t-SNE visualization...')
+    tsne_path = os.path.join(output_path, 'tsne_resnet.png')
+    resnet_model.display_features(train_image_feats, train_labels, 
+                                  title="t-SNE visualization of ResNet features (Training)",
+                                  save_path=tsne_path)
 
 
 elif FEATURE == 'bag of sift':
@@ -160,6 +177,66 @@ elif FEATURE == 'bag of sift':
         'train_labels': train_labels,
         'test_labels': test_labels
     }, feat_save_path)
+    
+    # Generate visualizations: histograms and SIFT keypoints
+    print('\nGenerating visualizations...')
+    
+    # Plot histograms for sample images (one per category)
+    hist_dir = os.path.join(output_path, 'histograms')
+    os.makedirs(hist_dir, exist_ok=True)
+    
+    sample_categories = ['Bedroom', 'Coast', 'Forest', 'Kitchen', 'Store']
+    for category in sample_categories:
+        if category in train_labels:
+            # Find first image of this category
+            indices = np.where(train_labels == category)[0]
+            if len(indices) > 0:
+                sample_idx = indices[0]
+                sample_path = train_image_paths[sample_idx]
+                
+                # Extract features for this image
+                sample_feats = get_bags_of_sifts([sample_path], vocab_size=vocab_size)
+                
+                # Plot histogram
+                hist_path = os.path.join(hist_dir, f'hist_{category}.png')
+                plot_histogram(sample_feats[0], vocab_size, hist_path, 
+                              title=f'BoW Histogram - {category} (vocab_size={vocab_size})')
+    
+    # Visualize SIFT keypoints for sample images
+    sift_dir = os.path.join(output_path, 'keypoints')
+    os.makedirs(sift_dir, exist_ok=True)
+    
+    for category in sample_categories:
+        if category in train_labels:
+            indices = np.where(train_labels == category)[0]
+            if len(indices) > 0:
+                sample_idx = indices[0]
+                sample_path = train_image_paths[sample_idx]
+                
+                # Visualize SIFT keypoints
+                sift_path = os.path.join(sift_dir, f'sift_{category}.png')
+                visualize_sift_keypoints(sample_path, sift_path, max_keypoints=500)
+    
+    # Generate t-SNE visualization for BoW features
+    print('\nGenerating t-SNE visualization for BoW features...')
+    tsne_path = os.path.join(output_path, f'tsne_bovw_vocab_{vocab_size}.png')
+    
+    # Use ResNet's display_features method to avoid code duplication
+    # Create a temporary ResNet instance to use its display_features method
+    resnet_model_temp = Resnet('resnet18')
+    
+    # Sample a subset for t-SNE (it's computationally expensive)
+    n_samples = min(1000, len(train_image_feats))
+    indices = np.random.choice(len(train_image_feats), n_samples, replace=False)
+    sampled_feats = train_image_feats[indices]
+    sampled_labels = train_labels[indices]
+    
+    resnet_model_temp.display_features(
+        sampled_feats, 
+        sampled_labels, 
+        title=f'Bag of Visual Words - t-SNE Visualization (vocab_size={vocab_size})',
+        save_path=tsne_path
+    )
    
 
 elif FEATURE == 'placeholder':
@@ -247,3 +324,5 @@ utils.display_results(test_labels, categories, predicted_categories,
                       feature_type=feature_str, 
                       model_type=model_str,
                       vocab_size=vocab_size_param)
+
+
