@@ -1,0 +1,21 @@
+# Generated outputs
+results/
+results_mine/
+results_old/
+bow_features_vocab_100.pkl
+bow_features_vocab_200.pkl
+bow_features_vocab_500.pkl
+svm_model.pkl
+svm_model_bovw.pkl
+svm_model_resnet.pkl
+
+# Generated outputs
+results/
+results_mine/
+results_old/
+bow_features_vocab_100.pkl
+bow_features_vocab_200.pkl
+bow_features_vocab_500.pkl
+svm_model.pkl
+svm_model_bovw.pkl
+svm_model_resnet.pkl
